@@ -48,6 +48,9 @@ def percentageError(approx, truth):
 def absPercentageError(approx,truth):
     return abs(percentageError(approx,truth))
 
+def mape(approx, truth):
+    return jnp.mean(abs(percentageError(approx,truth)))
+
 
 
 
@@ -87,7 +90,7 @@ def UpdateWeights(weights,gradients,learning_rate):
     return weights - learning_rate * gradients
 
 
-def train(X_train,Y_train,X_test,Y_test,rng_key,input_channels,epochs,learning_rates,params=None,forward_pass=None):
+def train(X_train,Y_train,X_test,Y_test,rng_key,input_channels,epochs,learning_rates,printEvery=5,params=None,forward_pass=None,tol = 1e-5):
     """
     Input parameter 'params' allows us to keep training a network that has already undergone some 
     training, without having to retrain from scratch
@@ -108,7 +111,7 @@ def train(X_train,Y_train,X_test,Y_test,rng_key,input_channels,epochs,learning_r
     printAllShapes(X_train,Y_train,X_test,Y_test)
     print("\n")
     
-    tol = 1e-5
+    
     losses = []
     val_losses = []
     start_time = time.time()
@@ -123,7 +126,7 @@ def train(X_train,Y_train,X_test,Y_test,rng_key,input_channels,epochs,learning_r
         params,loss,val_loss = train_step(params,X_train,Y_train,X_test,Y_test,learning_rate,forward_pass) #TODO: using test as validation, change this!
 
         
-        if i%10 == 0: #every n epochs
+        if i%printEvery == 0: #every n epochs
             print("Epoch {:.0f}/{:.0f}".format(i,epochs))
             print("\tmse : {:.6f}\t".format(loss), end='')
             print("\tval mse : {:.6f}".format(val_loss), end='')

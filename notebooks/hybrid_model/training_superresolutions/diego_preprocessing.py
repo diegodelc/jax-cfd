@@ -80,3 +80,22 @@ def creatingDataset(highDef,method,factor):
         ]))
     return low_def
 
+
+def calculateResiduals(X,Y):
+    out = []
+    for i in range(len(X)):
+        out.append(Y[i]-X[i])
+    return out
+
+
+def normalisingDataset(data):
+    theMean = np.mean(data)
+    theStdDev = np.std(data)
+    for i in range(len(data)):
+        data[i] = (data[i]-theMean)/theStdDev
+    return data,theMean,theStdDev
+
+def deNormalising(data,theMean,theStdDev):
+    for i in range(len(data)):
+        data[i] = data[i]*theStdDev+theMean
+    return data
