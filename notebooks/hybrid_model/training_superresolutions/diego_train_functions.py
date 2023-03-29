@@ -85,6 +85,7 @@ def train_step(params, X_train, Y_train,X_val,Y_val,learning_rate,forward_pass):
     val_loss = MeanSquaredErrorLoss(params, X_val,Y_val,forward_pass)
     return jax.tree_map(lambda p,g: p-learning_rate*g, params, param_grads), loss, val_loss
 
+#train_step_jit = jax.jit(train_step)
 
 def UpdateWeights(weights,gradients,learning_rate):
     return weights - learning_rate * gradients
@@ -122,18 +123,19 @@ def train(X_train,Y_train,X_test,Y_test,rng_key,input_channels,epochs,learning_r
         learning_rate = learning_rates[i-1]     
         
         
+        #TODO: using test as validation, change this!
+        params,loss,val_loss = train_step(params,X_train,Y_train,X_test,Y_test,learning_rate,forward_pass)
         
-        params,loss,val_loss = train_step(params,X_train,Y_train,X_test,Y_test,learning_rate,forward_pass) #TODO: using test as validation, change this!
 
         
-        if i%printEvery == 0: #every n epochs
+        if i%printEvery == 0 or i == 0: #every n epochs
             print("Epoch {:.0f}/{:.0f}".format(i,epochs))
             print("\tmse : {:.6f}\t".format(loss), end='')
             print("\tval mse : {:.6f}".format(val_loss), end='')
             time_now = time.time()
             time_taken = time_now - start_time
-            time_per_epoch = time_taken/i
-            epochs_remaining = epochs+1-i
+            time_per_epoch = time_taken/(i+1)
+            epochs_remaining = epochs+1-(i+1)
             time_remaining = epochs_remaining*time_per_epoch
             end_time = time.localtime(time_now + time_remaining)
             print("\tEstimated end time: {:d}:{:02d}:{:02d}".format(end_time.tm_hour, end_time.tm_min, end_time.tm_sec))
