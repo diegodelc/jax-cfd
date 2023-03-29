@@ -155,3 +155,14 @@ def train(X_train,Y_train,X_test,Y_test,rng_key,input_channels,epochs,learning_r
         print("\nFinished training at max epochs\n")
     
     return losses, val_losses, params
+
+
+
+def reshapeData(mydata,mygrid,
+                offsets=[(1.0,0.5),
+                         (0,5,1.0)],
+                bcs = [cfd.boundaries.channel_flow_boundary_conditions(ndim=2),
+                      cfd.boundaries.channel_flow_boundary_conditions(ndim=2)]):
+    """defaults to channel flow settings"""
+    return (grids.GridVariable(array = grids.GridArray(data = mydata[:,:,0],offset=offsets[0],grid=mygrid),bc=bcs[0]),
+          grids.GridVariable(array = grids.GridArray(data = mydata[:,:,1],offset=offsets[1],grid=mygrid),bc=bcs[1]))
