@@ -65,7 +65,7 @@ def dirichletPadding(data,pad,leftPad,rightPad,axis=0):
     implements dirichlet padding to both ends of given dimension
     
     axis=0 -> left and right
-    axis=1 -> top and bottom (transpose then left and right then transpose)
+    axis=1 -> top and bottom (transpose, then left and right, then transpose back)
     """
     if axis == 1:
         data = data.T
@@ -90,18 +90,101 @@ def padCorners(data,pad,value):
     
     return data
 
-def channelFlowPadding(data,kernel,topWall,lowWall):
-    (padRow,padCol) = findPadding(kernel)
+def channelFlowPadding(data,padding,topWall,lowWall):
+#     (padRow,padCol) = findPadding(kernel)
+    padRow = padding[0]
+    padCol = padding[1]
+    
     if padRow != padCol:
         raise AssertionError('Only square filters supported')
     
-    data = periodicPadding(data,padRow,axis = 1)
+    data = periodicPadding(data,padRow,axis = 0)
     
     
-    data = dirichletPadding(data,padCol,topWall,lowWall,axis = 0)
+    data = dirichletPadding(data,padCol,topWall,lowWall,axis = 1)
     
     return padCorners(data,padRow,0)
 
 def retrieveField(data,kernel):
     (padRow,padCol) = findPadding(kernel)
     return data.at[padRow:-padRow,padCol:-padCol].get()
+
+
+
+
+
+#these pad the datasets after the derivatives have been calculated
+def padXDataset(dataset,padding):
+    """
+    Only u and v velocities
+    """
+    times = len(dataset)
+    out = []
+    temp = createPaddedMesh(dataset[0][:,:,0],padding)
+    for i in range(times):
+        temp1 = createPaddedMesh(dataset[i][:,:,0],padding)
+        temp2 = createPaddedMesh(dataset[i][:,:,1],padding)
+        out.append(jnp.dstack([
+                channelFlowPadding(temp1,padding,0,0),
+                channelFlowPadding(temp2,padding,0,0)
+            ]))
+            
+            
+    return out
+
+def padYDataset(dataset,padding,conditions=None):
+    """
+    u
+    dudx
+    dudy
+    lap(u)
+
+    v
+    dvdx
+    dvdy
+    lap(v)
+    """
+    if conditions is None:
+        conditions = {
+            "u" : [0,0],
+            "dudx" : [0,0],
+            "dudy" : [0,0],
+            "lap(u)" : [0,0],
+
+            "v" : [0,0],
+            "dvdx" : [0,0],
+            "dvdy" : [0,0],
+            "lap(v)" : [0,0]
+        }
+    
+    #read them once
+    [uT,uB] = conditions["u"]
+    [dudxT,dudxB] = conditions["dudx"]
+    [dudyT,dudyB] = conditions["dudy"]
+    [lapUT,lapUB] = conditions["lap(u)"]
+    
+    [vT,vB] = conditions["u"]
+    [dvdxT,dvdxB] = conditions["dvdx"]
+    [dvdyT,dvdyB] = conditions["dvdy"]
+    [lapVT,lapVB] = conditions["lap(v)"]
+    
+    times,_,_,channels = jnp.shape(dataset)
+    out = []
+    temp = createPaddedMesh(dataset[0][:,:,0],padding)
+    for i in range(times):
+        temp = []
+        for j in range(channels):
+            temp.append(createPaddedMesh(dataset[i][:,:,j],padding))
+        
+        out.append(jnp.dstack([
+            channelFlowPadding(temp[0],padding,uT,uB),       # u
+            channelFlowPadding(temp[1],padding,dudxT,dudxB), # dudx
+            channelFlowPadding(temp[2],padding,dudyT,dudyB), # dudy
+            channelFlowPadding(temp[3],padding,lapUT,lapUB), # lap(u)
+            
+            channelFlowPadding(temp[4],padding,vT,vB),       # v
+            channelFlowPadding(temp[5],padding,dvdxT,dvdxB), # dvdx
+            channelFlowPadding(temp[6],padding,dvdyT,dvdyB), # dvdy
+            channelFlowPadding(temp[7],padding,lapVT,lapVB), # lap(v)
+        ]))
+    return out
