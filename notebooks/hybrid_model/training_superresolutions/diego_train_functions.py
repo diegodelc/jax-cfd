@@ -4,6 +4,9 @@ import jax.numpy as jnp
 import jax
 from jax import value_and_grad
 
+import jax_cfd.base as cfd
+from jax_cfd.base import grids
+
 import time
 
 

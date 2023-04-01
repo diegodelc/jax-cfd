@@ -99,3 +99,92 @@ def deNormalising(data,theMean,theStdDev):
     for i in range(len(data)):
         data[i] = data[i]*theStdDev+theMean
     return data
+
+#This is way too slow, learn to use jax.jit and maybe make it faster, for now use the numpy implementation below
+def calculateALLDerivativesJAX(data,size,domain,postprocess,factor):
+    mygrid = cfd.grids.Grid(size,domain=domain)
+    
+    data = reshapeData(test,mygrid)
+
+    return jnp.dstack([
+            postprocess(data[0].data,factor),#u
+            postprocess(data[1].data,factor),#v
+
+            postprocess(fd.laplacian(data[0]).data,factor), #lap(u)
+            postprocess(fd.forward_difference(data[0],axis=0).data,factor), #dudx
+            postprocess(fd.forward_difference(data[0],axis=1).data,factor), #dudy
+
+            postprocess(fd.laplacian(data[1]).data,factor), #lap(v)
+            postprocess(fd.forward_difference(data[1],axis=0).data,factor), #dvdx
+            postprocess(fd.forward_difference(data[1],axis=1).data,factor) #dvdy
+        ])
+
+def npLaplacian(data):
+    """
+    ddx^2 + ddy^2
+    """
+    
+    ddx2 = np.gradient(np.gradient(data,axis=1),axis=1)
+    ddy2 = np.gradient(np.gradient(data,axis=0),axis=0)
+    
+    return ddx2 + ddy2
+
+def calculateALLDerivativesNUMPY(data,postprocess,factor):
+    """
+    Calculates derivatives and laplacians of velocity fields and returns them stacked in a DeviceArray in the following format:
+    
+        u
+        dudx
+        dudy
+        lap(u)
+
+        v
+        dvdx
+        dvdy
+        lap(v)
+    
+    Uses numpy methodologies, returns jax.numpy datatype
+    """
+    
+    
+    #u
+    u = data[:,:,0]
+    du = np.gradient(u)
+    lapu = npLaplacian(u)
+    
+    #v
+    v = data[:,:,1]
+    dv = np.gradient(v)
+    lapv = npLaplacian(v)
+    
+    #postprocess
+    if postprocess is not None:
+        u = postprocess(u,factor)
+        du[0] = postprocess(du[0],factor)
+        du[1] = postprocess(du[1],factor)
+        lapu = postprocess(lapu,factor)
+        
+        v = postprocess(v,factor)
+        dv[0] = postprocess(dv[0],factor)
+        dv[1] = postprocess(dv[1],factor)
+        lapv = postprocess(lapv,factor)
+        
+    
+    return jnp.dstack([
+            u,
+            du[1],
+            du[0],
+            lapu,
+
+            v,
+            dv[1],
+            dv[0],
+            lapv
+        ])
+
+
+def createDatasetDerivatives(dataset,postprocess,factor):
+    out = []
+    for i in range(len(dataset)):
+        out.append(calculateALLDerivativesNUMPY(dataset[i],postprocess,factor))
+    return out
