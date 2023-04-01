@@ -1,5 +1,6 @@
 import haiku as hk
 
+
 def forward_pass_module(
     num_output_channels,
     ndim,
