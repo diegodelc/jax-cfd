@@ -163,9 +163,8 @@ def calculateALLDerivativesNUMPY(data,postprocess,factor,which_outputs):
     output_list = []
     #u
     u = data[:,:,0]
-    u = postprocess(u,factor)
     if which_outputs["u"] is True:
-        output_list.append(u)
+        output_list.append(postprocess(u,factor))
     
     if which_outputs["du"] is True:
         du = np.gradient(u)
@@ -181,9 +180,8 @@ def calculateALLDerivativesNUMPY(data,postprocess,factor,which_outputs):
     
     #v
     v = data[:,:,1]
-    v = postprocess(v,factor)
     if which_outputs["v"] is True:
-        output_list.append(v)
+        output_list.append(postprocess(v,factor))
         
     if which_outputs["dv"] is True:
         dv = np.gradient(v)
