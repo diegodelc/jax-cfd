@@ -134,57 +134,42 @@ def padXDataset(dataset,padding):
 
 def padYDataset(dataset,padding,conditions=None):
     """
-    u
-    dudx
-    dudy
-    lap(u)
+    conditions = [
+            [0,0],#u
+            [0,0],#dudx
+            [0,0],#dudy
+            [0,0],#lapu
 
-    v
-    dvdx
-    dvdy
-    lap(v)
+            [0,0],#v
+            [0,0],#dvdx
+            [0,0],#dvdy
+            [0,0]#lapv
+        ]
     """
-    if conditions is None:
-        conditions = {
-            "u" : [0,0],
-            "dudx" : [0,0],
-            "dudy" : [0,0],
-            "lap(u)" : [0,0],
-
-            "v" : [0,0],
-            "dvdx" : [0,0],
-            "dvdy" : [0,0],
-            "lap(v)" : [0,0]
-        }
-    
-    #read them once
-    [uT,uB] = conditions["u"]
-    [dudxT,dudxB] = conditions["dudx"]
-    [dudyT,dudyB] = conditions["dudy"]
-    [lapUT,lapUB] = conditions["lap(u)"]
-    
-    [vT,vB] = conditions["u"]
-    [dvdxT,dvdxB] = conditions["dvdx"]
-    [dvdyT,dvdyB] = conditions["dvdy"]
-    [lapVT,lapVB] = conditions["lap(v)"]
-    
     times,_,_,channels = jnp.shape(dataset)
+    
+    if conditions is None:
+        conditions = []
+        for i in range(channels):
+            conditions.append([0,0])
+    
+    
+    
+    if channels != len(conditions):
+        raise AssertionError("Number of channels and bcs are incompatible")
     out = []
     temp = createPaddedMesh(dataset[0][:,:,0],padding)
     for i in range(times):
-        temp = []
+        temp_out = []
         for j in range(channels):
-            temp.append(createPaddedMesh(dataset[i][:,:,j],padding))
+            temp_out.append(channelFlowPadding(
+                                createPaddedMesh(dataset[i][:,:,j],padding),
+                                padding,
+                                conditions[j][0],
+                                conditions[j][1],
+                            )
+            )
         
-        out.append(jnp.dstack([
-            channelFlowPadding(temp[0],padding,uT,uB),       # u
-            channelFlowPadding(temp[1],padding,dudxT,dudxB), # dudx
-            channelFlowPadding(temp[2],padding,dudyT,dudyB), # dudy
-            channelFlowPadding(temp[3],padding,lapUT,lapUB), # lap(u)
-            
-            channelFlowPadding(temp[4],padding,vT,vB),       # v
-            channelFlowPadding(temp[5],padding,dvdxT,dvdxB), # dvdx
-            channelFlowPadding(temp[6],padding,dvdyT,dvdyB), # dvdy
-            channelFlowPadding(temp[7],padding,lapVT,lapVB), # lap(v)
-        ]))
+        out.append(jnp.dstack(temp_out))
+        
     return out
