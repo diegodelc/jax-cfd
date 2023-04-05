@@ -156,7 +156,6 @@ class MyTraining():
         start_time_local = time.localtime(start_time)
         print("\nStart time: {:d}:{:02d}:{:02d}".format(start_time_local.tm_hour, start_time_local.tm_min, start_time_local.tm_sec))
         
-        train_step = jax.jit(self.train_step)
         
         for i in range(1, self.epochs+1):
 
