@@ -40,10 +40,8 @@ class MyTraining():
         self.input_channels = input_channels
         self.epochs = epochs
         
-        if batch_size == None:
-            batch_size = len(X_train)
-        else:
-            self.batch_size = batch_size
+        
+        self.batch_size = batch_size
         self.validateEvery = validateEvery
        
         self.printEvery = printEvery
@@ -148,7 +146,10 @@ class MyTraining():
         Input parameter 'params' allows us to keep training a network that has already undergone some 
         training, without having to retrain from scratch
         """
-
+        if self.batch_size == None:
+            self.batch_size = len(X_train)
+        
+            
         shapes = np.shape(self.X_train)
         if self.input_channels != shapes[3]:
             print(self.input_channels,shapes[3])
