@@ -28,9 +28,10 @@ def staggeredLearningRate(*args):
     return learning_rates
 
 
+
         
 class MyTraining():
-    def __init__(self,X_train,Y_train,X_test,Y_test,rng_key,input_channels,epochs,learning_rates,printEvery=5,params=None,forward_pass=None,tol = 1e-5):
+    def __init__(self,X_train,Y_train,X_test,Y_test,rng_key,input_channels,epochs,learning_rates,batch_size = 32,validateEvery=1,printEvery=5,params=None,forward_pass=None,tol = 1e-5):
         self.X_train = X_train
         self.Y_train = Y_train
         self.X_test = X_test
@@ -38,6 +39,12 @@ class MyTraining():
         self.rng_key = rng_key
         self.input_channels = input_channels
         self.epochs = epochs
+        
+        if batch_size == None:
+            batch_size = len(X_train)
+        else:
+            self.batch_size = batch_size
+        self.validateEvery = validateEvery
        
         self.printEvery = printEvery
         self.params = params
@@ -120,10 +127,18 @@ class MyTraining():
 #         return jax.tree_map(self.UpdateWeights, param_grads), loss, val_loss
         return jax.tree_map(lambda p,g: p-self.learning_rate*g, self.params, param_grads), loss, val_loss
 
-#     train_step_jit = jax.jit(train_step)
+    def train_stepNoValidation(self,X_train_batch,Y_train_batch):
+            loss, param_grads = value_and_grad(self.MeanSquaredErrorLoss)(self.params,self.X_train, self.Y_train)
 
-    def UpdateWeights(self,gradients):
-        return self.params - self.learning_rate * gradients
+
+            return jax.tree_map(self.UpdateWeights,self.params,param_grads), loss
+#             return jax.tree_map(lambda p,g: p-self.learning_rate*g, self.params, param_grads), loss
+
+    def eval_validation(self):
+        return self.MeanSquaredErrorLoss(self.params,self.X_test,self.Y_test)
+
+    def UpdateWeights(self,params,gradients):
+        return params - self.learning_rate * gradients
 
     
 
@@ -156,24 +171,39 @@ class MyTraining():
         start_time_local = time.localtime(start_time)
         print("\nStart time: {:d}:{:02d}:{:02d}".format(start_time_local.tm_hour, start_time_local.tm_min, start_time_local.tm_sec))
         
+        num_batches = len(self.X_train)//self.batch_size+1
+        
         
         for i in range(1, self.epochs+1):
-
+            if i%self.printEvery == 0 or i == 1: #every n epochs
+                print("Epoch {:.0f}/{:.0f}".format(i,self.epochs))
 
             #will fail if learning rates list is not long enough, in which case it keeps using value from last loop
             self.learning_rate = self.learning_rates[i-1]     
 
 
             #TODO: using test as validation, change this!
-            self.params,loss,val_loss = self.train_step()
+            for batch in range(num_batches):
+                if batch != num_batches-1:
+                    start, end = int(batch*self.batch_size), int(batch*self.batch_size+self.batch_size)
+                else:
+                    start, end = int(batch*self.batch_size), None
+                
+                X_batch, Y_batch = self.X_train[start:end], self.Y_train[start:end]
+                
+                self.params,loss = self.train_stepNoValidation(X_batch,Y_batch)
+                self.losses.append(loss)
             
-
+            if i%self.validateEvery == 0 or i == 1:
+                val_loss = self.eval_validation()
+                self.val_losses.append(val_loss)
 
 
             if i%self.printEvery == 0 or i == 1: #every n epochs
-                print("Epoch {:.0f}/{:.0f}".format(i,self.epochs))
-                print("\tmse : {:.6f}\t".format(loss), end='')
-                print("\tval mse : {:.6f}".format(val_loss), end='')
+                
+                print("\tmse : {:.6f}\t".format(self.losses[-1]), end='')
+                if len(self.val_losses) > 0:
+                    print("\tval mse : {:.6f}".format(self.val_losses[-1]), end='')
                 time_now = time.time()
                 time_taken = time_now - start_time
                 time_per_epoch = time_taken/(i+1)
@@ -182,14 +212,15 @@ class MyTraining():
                 end_time = time.localtime(time_now + time_remaining)
                 print("\tEstimated end time: {:d}:{:02d}:{:02d}".format(end_time.tm_hour, end_time.tm_min, end_time.tm_sec))
                 print("\n")
-            self.losses.append(loss)
-            self.val_losses.append(val_loss)
+            
+            
 
             if i != 1:
                 if abs(self.losses[-2]-self.losses[-1])<self.tol:
                     print("\nConvergence reached at epoch {:.0f}".format(i))
-                    print("\tmse : {:.6f}\t".format(loss), end='')
-                    print("\tval mse : {:.6f}".format(val_loss), end='')
+                    print("\tmse : {:.6f}\t".format(self.losses[-1]), end='')
+                    if self.val_loss[-1] is not None:
+                        print("\tval mse : {:.6f}".format(self.val_loss[-1]), end='')
                     print("\n")
                     break
 

@@ -24,9 +24,11 @@ class CNN(hk.Module):
         
         self.components = components
         
+        self.convModel = hk.Sequential(self.components)
+        
         
     def __call__(self, x):
-        x = hk.Sequential(self.components)(x)
+        x = self.convModel(x)
         return x
 
 # def ConvNet(x,CNN_specs=None):
