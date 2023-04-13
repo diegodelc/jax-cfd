@@ -1,6 +1,7 @@
 import numpy as np
 import jax.numpy as jnp
 
+from jax_cfd.ml.diego_cnn_bcs import retrieveField, createPaddedMesh, channelFlowPadding
 
 def increaseSize(input, factor):
     w,h = np.shape(input)
@@ -313,7 +314,7 @@ def createYDatasetNew(data,which_outputs,padding,factor):
     return out
 
 def getYdata(data,which_outputs,padding,postprocess,factor):
-    Y = createYDatasetNew(high_def_norm,which_outputs,padding,factor) #pads and calculates derivatives
+    Y = createYDatasetNew(data,which_outputs,padding,factor) #pads and calculates derivatives
     
     Y = retrieveAll(Y,padding) #removes padding
     
