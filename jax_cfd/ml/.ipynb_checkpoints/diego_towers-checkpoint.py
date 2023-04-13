@@ -31,9 +31,9 @@ class CNN(hk.Module):
         x = self.convModel(x)
         return x
 
-# def ConvNet(x,CNN_specs=None):
-#     cnn = CNN(CNN_specs)
-#     return cnn(x)
+def ConvNet(x):
+    cnn = CNN(CNN_specs)
+    return cnn(x)
 
 
 def build_forward_pass(CNN_specs=None):
