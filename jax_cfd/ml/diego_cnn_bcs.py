@@ -105,12 +105,14 @@ def channelFlowPadding(data,padding,topWall,lowWall):
     
     return padCorners(data,padRow,0)
 
-def retrieveField(data,kernel):
-    (padRow,padCol) = findPadding(kernel)
-    return data.at[padRow:-padRow,padCol:-padCol].get()
+# def retrieveField(data,padding):
+#     padRow = padding[0]
+#     padCol = padding[1]
+#     return data.at[padRow:-padRow,padCol:-padCol].get()
 
 
-
+def retrieveField(data,padRow,padCol):
+    return data[padRow:-padRow,padCol:-padCol]
 
 
 #these pad the datasets after the derivatives have been calculated
@@ -120,7 +122,7 @@ def padXDataset(dataset,padding):
     """
     times = len(dataset)
     out = []
-    temp = createPaddedMesh(dataset[0][:,:,0],padding)
+#     temp = createPaddedMesh(dataset[0][:,:,0],padding)
     for i in range(times):
         temp1 = createPaddedMesh(dataset[i][:,:,0],padding)
         temp2 = createPaddedMesh(dataset[i][:,:,1],padding)

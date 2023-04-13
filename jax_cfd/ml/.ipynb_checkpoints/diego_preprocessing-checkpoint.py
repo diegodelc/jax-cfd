@@ -39,21 +39,40 @@ def downsampleHighDefVels(high_def,factor):
         low_def.append(both_vels)
     return low_def
 
-def sampling(input,factor):
-    """performs sampling operation"""
+# def sampling(input,factor):
+#     """performs sampling operation"""
     
-    w,h = np.shape(input)
-    if w%factor != 0 or h%factor != 0:
-        raise(AssertionError("Non-compatible input shape and downsample factor"))
+#     w,h = np.shape(input)
+#     if w%factor != 0 or h%factor != 0:
+#         raise(AssertionError("Non-compatible input shape and downsample factor"))
     
-    output = np.zeros((int(w/factor),int(h/factor)))
-    #print(np.shape(output))
+#     output = np.zeros((int(w/factor),int(h/factor)))
+#     #print(np.shape(output))
     
-    for width in range(0,w,factor):
-        for height in range(0,h,factor):
-            output[width//factor][height//factor] = input[width][height]
+#     for width in range(0,w,factor):
+#         for height in range(0,h,factor):
+#             output[width//factor][height//factor] = input[width][height]
             
-    return output
+#     return output
+
+
+def sampling(data,factor):
+    return data[0::factor,0::factor]
+
+
+# def newSampling(input,factor,precomputed):
+#     """performs sampling operation"""
+    
+    
+    
+#     output = np.zeros((precomputed["wf"],precomputed["hf"]))
+#     #print(np.shape(output))
+    
+#     for width in range(0,precomputed["w"],factor):
+#         for height in range(0,precomputed["h"],factor):
+#             output[precomputed["wff"]-1][precomputed["hff"]-1] = input[precomputed["w"]][precomputed["h"]]
+            
+#     return output
     
 
 def creatingDataset(highDef,method,factor):
@@ -205,3 +224,99 @@ def createDatasetDerivatives(dataset,postprocess,factor,which_outputs):
     for i in range(len(dataset)):
         out.append(calculateALLDerivativesNUMPY(dataset[i],postprocess,factor,which_outputs))
     return out
+
+
+
+# new way to apply bcs, apply to u and v and infer for the rest
+def retrieveAll(data,padding):
+    
+    myshape = np.shape(data)
+    out = []
+    for time in range(myshape[0]):
+        partial = []
+        for channel in range(myshape[-1]):
+            partial.append(retrieveField(data[time][:,:,channel],padding[0],padding[1]))
+        out.append(jnp.dstack(partial))
+
+    return out
+
+def sampleAll(data,factor,postprocess = sampling):
+    myshape = np.shape(data)
+    out = []
+    for time in range(myshape[0]):
+        partial = []
+        for channel in range(myshape[-1]):
+            partial.append(postprocess(data[time][:,:,channel],factor))
+        out.append(jnp.dstack(partial))
+    return out
+def yDatasetOneTime(dataIN,which_outputs,padding,factor):
+    
+    # here we apply the bcs
+    u = dataIN[:,:,0]
+    
+    u = createPaddedMesh(u,padding)
+    
+    v = dataIN[:,:,1]
+    v = createPaddedMesh(v,padding)
+#     print(u)
+    
+    u = channelFlowPadding(u,padding,0,0)
+    v = channelFlowPadding(v,padding,0,0)
+#     print(u)
+            
+    
+    output_list = []
+    if which_outputs["vels"]:
+        output_list.append(u)
+        output_list.append(v)
+    
+    if which_outputs["derivatives"]:
+        du = np.gradient(u)
+        du = jnp.array(du)
+        output_list.append(du[0])
+        output_list.append(du[1])
+        
+        dv = np.gradient(v)
+        dv = jnp.array(dv)
+        output_list.append(dv[0])
+        output_list.append(dv[1])
+    
+    if which_outputs["laplacians"]:
+        lapu = npLaplacian(u)
+        lapu = jnp.array(lapu)
+        output_list.append(lapu)
+        
+        lapv = npLaplacian(v)
+        lapv = jnp.array(lapv)
+        output_list.append(lapv)
+    
+    return jnp.dstack(output_list)
+    
+    
+def createYDatasetNew(data,which_outputs,padding,factor):
+    w,h,_ = np.shape(data[0])
+    precomputed = {
+        "w" : w,
+        "h" : h,
+        "wf" : int(w/factor),
+        "hf" : int(h/factor),
+        "wff" : w//factor,
+        "hff" : h//factor
+    }
+    
+    out = []
+    j = 0
+    for i in data:
+        out.append(yDatasetOneTime(i,which_outputs,padding,factor))
+        j += 1
+        
+    return out
+
+def getYdata(data,which_outputs,padding,postprocess,factor):
+    Y = createYDatasetNew(high_def_norm,which_outputs,padding,factor) #pads and calculates derivatives
+    
+    Y = retrieveAll(Y,padding) #removes padding
+    
+    Y = sampleAll(Y,factor,postprocess) #samples data to coarse grid dimensions
+    
+    return Y
