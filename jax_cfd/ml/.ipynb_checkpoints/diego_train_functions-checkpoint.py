@@ -235,7 +235,7 @@ class MyTraining():
 
 def reshapeData(mydata,mygrid,
                 offsets=[(1.0,0.5),
-                         (0,5,1.0)],
+                         (0.5,1.0)],
                 bcs = [cfd.boundaries.channel_flow_boundary_conditions(ndim=2),
                       cfd.boundaries.channel_flow_boundary_conditions(ndim=2)]):
     """defaults to channel flow settings"""
