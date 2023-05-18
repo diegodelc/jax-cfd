@@ -123,6 +123,9 @@ def navier_stokes_explicit_terms(
   @functools.partial(jax.named_call, name='navier_stokes_momentum')
   def _explicit_terms(v):
     dv_dt = convection(v)
+    print("v: ")
+    print(v)
+    print("")
     if viscosity is not None:
       dv_dt += diffusion_(v, viscosity / density)
     if forcing is not None:
