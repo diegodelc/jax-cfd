@@ -1,5 +1,8 @@
 import haiku as hk
 from jax_cfd.ml import nonlinearities
+from jax_cfd.ml.towers import scale_to_range
+import functools
+import jax.numpy as jnp
 
 class CNN(hk.Module):
     def __init__(self,CNN_specs=None):
@@ -13,6 +16,8 @@ class CNN(hk.Module):
         super().__init__(name="CNN")
         components = []
         
+#         components.append(functools.partial(scale_to_range, axes=ndim_axes))
+        
         if CNN_specs["nonlinearity"] == "relu":
             nonlinearity = nonlinearities.relu
         
@@ -21,19 +26,27 @@ class CNN(hk.Module):
             components.append(nonlinearity)
         
         components.append(hk.Conv2D(output_channels=CNN_specs["num_output_channels"], kernel_shape=(3,3), padding="SAME"))
+        ndim = 2
+        self.ndim_axes = list(range(ndim))
+        self.scale_fn = functools.partial(scale_to_range, axes=self.ndim_axes)
         
+    
         self.components = components
         
         self.convModel = hk.Sequential(self.components)
         
         
     def __call__(self, x):
-        x = self.convModel(x)
-        return x
+        minx = jnp.min(x)
+        maxx = jnp.max(x)
+        
+#         x = self.convModel(x)
+#         return x
+        return self.convModel(scale_to_range(x,self.ndim_axes,0,1))
 
-def ConvNet(x):
-    cnn = CNN(CNN_specs)
-    return cnn(x)
+# def ConvNet(x):
+#     cnn = CNN(CNN_specs)
+#     return cnn(x)
 
 
 def build_forward_pass(CNN_specs=None):
