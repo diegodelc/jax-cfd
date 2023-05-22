@@ -107,7 +107,7 @@ def navier_stokes_explicit_terms(
   
   def diffuse_velocity(v, *args):
     out = tuple(diffuse(u, *args) for u in v) #this assumes v is a tuple of u and v, if we dstack this it becomes a valid input for the CNN
-    print(out)
+#     print(out)
     return out
     
   
@@ -123,9 +123,9 @@ def navier_stokes_explicit_terms(
   @functools.partial(jax.named_call, name='navier_stokes_momentum')
   def _explicit_terms(v):
     dv_dt = convection(v)
-    print("v: ")
-    print(v)
-    print("")
+#     print("v: ")
+#     print(v)
+#     print("")
     if viscosity is not None:
       dv_dt += diffusion_(v, viscosity / density)
     if forcing is not None:

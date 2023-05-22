@@ -3,6 +3,7 @@ from jax_cfd.ml import nonlinearities
 from jax_cfd.ml.towers import scale_to_range
 import functools
 import jax.numpy as jnp
+from jax.random import PRNGKey as randomKey
 
 class CNN(hk.Module):
     def __init__(self,CNN_specs=None):
@@ -24,11 +25,12 @@ class CNN(hk.Module):
         for i in range(CNN_specs["hidden_layers"]):
             components.append(hk.Conv2D(output_channels=CNN_specs["hidden_channels"], kernel_shape=(3,3), padding="SAME"))
             components.append(nonlinearity)
+            components.append(hk.dropout(randomKey(42),0.2))
         
         components.append(hk.Conv2D(output_channels=CNN_specs["num_output_channels"], kernel_shape=(3,3), padding="SAME"))
-        ndim = 2
-        self.ndim_axes = list(range(ndim))
-        self.scale_fn = functools.partial(scale_to_range, axes=self.ndim_axes)
+#         ndim = 2
+#         self.ndim_axes = list(range(ndim))
+#         self.scale_fn = functools.partial(scale_to_range, axes=self.ndim_axes)
         
     
         self.components = components
@@ -37,16 +39,31 @@ class CNN(hk.Module):
         
         
     def __call__(self, x):
-        minx = jnp.min(x)
-        maxx = jnp.max(x)
-        
-#         x = self.convModel(x)
-#         return x
-        return self.convModel(scale_to_range(x,self.ndim_axes,0,1))
+#         minx = jnp.min(x)
+#         maxx = jnp.max(x)
+#         meanX = jnp.mean(x)
+#         stdX = jnp.std(x)
+#         normX = (x-meanX)/stdX
+#         x = self.convModel(normX)
+#         return x*stdX + meanX
+        x = self.convModel(x)
+        return x
+#         return self.convModel(scale_to_range(x,self.ndim_axes,0,1))
 
-# def ConvNet(x):
-#     cnn = CNN(CNN_specs)
-#     return cnn(x)
+class CNN_Dropout(hk.Module):
+    def __init__(self, CNN_specs):
+        super().__init__(name="CNN")
+        self.CNN_specs = CNN_specs
+        
+        
+    def __call__(self,x):
+        for i in range(self.CNN_specs["hidden_layers"]):
+            x = hk.Conv2D(output_channels=self.CNN_specs["hidden_channels"], kernel_shape=(3,3), padding="SAME")(x)
+            x = nonlinearities.relu(x)
+            x = hk.dropout(randomKey(42),0.2,x)
+        
+        x = hk.Conv2D(output_channels=self.CNN_specs["num_output_channels"], kernel_shape=(3,3), padding="SAME")(x)
+        return x
 
 
 def build_forward_pass(CNN_specs=None):
