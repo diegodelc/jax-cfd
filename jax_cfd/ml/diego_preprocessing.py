@@ -1,5 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
+import cv2
 
 from jax_cfd.ml.diego_cnn_bcs import retrieveField, createPaddedMesh, channelFlowPadding
 
@@ -15,7 +16,7 @@ def increaseSize(input,factor):
     return output
 
 
-def decreaseSize(input,factor):
+def decreaseSize(input,factor): #or you could just sample, you animal
     w,h = np.shape(input)
     if w%factor != 0 or h%factor != 0:
         raise(AssertionError("Non-compatible input shape and downsample factor"))
@@ -47,13 +48,16 @@ def downsampleHighDefVelsNumpy(high_def,factor):
     due to performance issues with these functions and DeviceArrays (jnp arrays)
     """
     low_def = []
+    [x,y,_] = np.shape(high_def[0])
     for vels in high_def:
 
         u = decreaseSize(np.array(vels[:,:,0]),factor) #output is a np.array
-        u = jnp.array(increaseSize(u,factor)) #output is a DeviceArray
+        u = jnp.array(cv2.resize(u, dsize=(int(y), int(x)), interpolation=cv2.INTER_CUBIC)) #output is a DeviceArray
+        
+        
 
         v = decreaseSize(np.array(vels[:,:,1]),factor) #output is a np.array
-        v = jnp.array(increaseSize(v,factor)) #output is a DeviceArray
+        v = jnp.array(cv2.resize(v, dsize=(int(y), int(x)), interpolation=cv2.INTER_CUBIC)) #output is a DeviceArray
 
         low_def.append(jnp.dstack([
             u,
