@@ -25,7 +25,7 @@ class CNN(hk.Module):
         for i in range(CNN_specs["hidden_layers"]):
             components.append(hk.Conv2D(output_channels=CNN_specs["hidden_channels"], kernel_shape=(3,3), padding="SAME"))
             components.append(nonlinearity)
-            components.append(hk.dropout(randomKey(42),0.2))
+#             components.append(hk.dropout(randomKey(42),0.2))
         
         components.append(hk.Conv2D(output_channels=CNN_specs["num_output_channels"], kernel_shape=(3,3), padding="SAME"))
 #         ndim = 2

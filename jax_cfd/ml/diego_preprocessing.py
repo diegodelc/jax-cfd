@@ -3,14 +3,73 @@ import jax.numpy as jnp
 
 from jax_cfd.ml.diego_cnn_bcs import retrieveField, createPaddedMesh, channelFlowPadding
 
-def increaseSize(input, factor):
+
+    
+def increaseSize(input,factor):
     w,h = np.shape(input)
     output = np.zeros((w*factor,h*factor))
-    
+
     for width in range(w*factor):
         for height in range(h*factor):
             output[width][height] = input[width//factor][height//factor]
     return output
+
+
+def decreaseSize(input,factor):
+    w,h = np.shape(input)
+    if w%factor != 0 or h%factor != 0:
+        raise(AssertionError("Non-compatible input shape and downsample factor"))
+
+    output = np.zeros((int(w/factor),int(h/factor)))
+
+    for width in range(w):
+        for height in range(h):
+            output[width//factor][height//factor] += input[width][height]
+    output /= factor**len(np.shape(output))
+    return output
+
+def downsampleHighDefVels(high_def,factor):
+    print("WARNING: Use downsampleHighDefVelsNumpy for better performance")
+    low_def = []
+    for vels in high_def:
+        both_vels = []
+        for vel in vels:
+            vel = decreaseSize(vel,factor)
+
+            vel = increaseSize(vel,factor)
+            both_vels.append(vel)
+        low_def.append(both_vels)
+    return low_def
+
+def downsampleHighDefVelsNumpy(high_def,factor):
+    """
+    Same as downsampleHighDefVels but running the resizings on numpy arrays
+    due to performance issues with these functions and DeviceArrays (jnp arrays)
+    """
+    low_def = []
+    for vels in high_def:
+
+        u = decreaseSize(np.array(vels[:,:,0]),factor) #output is a np.array
+        u = jnp.array(increaseSize(u,factor)) #output is a DeviceArray
+
+        v = decreaseSize(np.array(vels[:,:,1]),factor) #output is a np.array
+        v = jnp.array(increaseSize(v,factor)) #output is a DeviceArray
+
+        low_def.append(jnp.dstack([
+            u,
+            v
+        ]))
+    return low_def
+
+
+# def increaseSize(input, factor):
+#     w,h = np.shape(input)
+#     output = np.zeros((w*factor,h*factor))
+    
+#     for width in range(w*factor):
+#         for height in range(h*factor):
+#             output[width][height] = input[width//factor][height//factor]
+#     return output
 
 
 def mean_pooling(input,factor):
@@ -28,17 +87,17 @@ def mean_pooling(input,factor):
     output /= factor**len(np.shape(output))
     return output
 
-def downsampleHighDefVels(high_def,factor):
-    low_def = []
-    for vels in high_def:
-        both_vels = []
-        for vel in vels:
-            vel = decreaseSize(vel,factor)
+# def downsampleHighDefVels(high_def,factor):
+#     low_def = []
+#     for vels in high_def:
+#         both_vels = []
+#         for vel in vels:
+#             vel = decreaseSize(vel,factor)
 
-            vel = increaseSize(vel,factor)
-            both_vels.append(vel)
-        low_def.append(both_vels)
-    return low_def
+#             vel = increaseSize(vel,factor)
+#             both_vels.append(vel)
+#         low_def.append(both_vels)
+#     return low_def
 
 # def sampling(input,factor):
 #     """performs sampling operation"""
