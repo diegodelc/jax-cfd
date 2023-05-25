@@ -115,6 +115,13 @@ def navier_stokes_explicit_terms(
   
   diffusion_ = _wrap_term_as_vector(diffuse_velocity, name='diffusion')
   
+  def printer(v,name):
+    print(name + " from printer")
+    print(v)
+    print("")
+  
+  printer_ = _wrap_term_as_vector(printer, name='printer')
+
   
   if forcing is not None:
     forcing = _wrap_term_as_vector(forcing, name='forcing')
@@ -122,10 +129,9 @@ def navier_stokes_explicit_terms(
   @tree_math.wrap
   @functools.partial(jax.named_call, name='navier_stokes_momentum')
   def _explicit_terms(v):
+    printer_(v,"v")
     dv_dt = convection(v)
-#     print("v: ")
-#     print(v)
-#     print("")
+    printer_(dv_dt,"dvdt")
     if viscosity is not None:
       dv_dt += diffusion_(v, viscosity / density)
     if forcing is not None:
@@ -262,7 +268,131 @@ def corrected_navier_stokes_explicit_terms(
 
   return explicit_terms_with_same_bcs
 
+def sampling(data,factor):
+    return data[0::factor,0::factor,:]
 
+def HYBMOD2_semi_implicit_navier_stokes(
+    density: float,
+    viscosity: float,
+    dt: float,
+    grid: grids.Grid,
+#     convect: Optional[ConvectFn] = None,
+#     diffuse: DiffuseFn = diffusion.diffuse,
+    factor: float,
+    superresFun = lambda x: x,
+    pressure_solve: Callable = pressure.solve_fast_diag,
+    forcing: Optional[ForcingFn] = None,
+    time_stepper: Callable = time_stepping.forward_euler,
+) -> Callable[[GridVariableVector], GridVariableVector]:
+  """Returns a function that performs a time step of Navier Stokes."""
+
+  explicit_terms = HYBMOD2_navier_stokes_explicit_terms(
+      density=density,
+      viscosity=viscosity,
+      dt=dt,
+      grid=grid,
+      factor = factor,
+      applySuperresolution = superresFun,
+      forcing=forcing)
+
+  pressure_projection = jax.named_call(pressure.projection, name='pressure')
+
+  # TODO(jamieas): Consider a scheme where pressure calculations and
+  # advection/diffusion are staggered in time.
+  ode = time_stepping.ExplicitNavierStokesODE(
+      explicit_terms,
+      lambda v: pressure_projection(v, pressure_solve)
+  )
+  step_fn = time_stepper(ode, dt)
+  return step_fn
+
+def HYBMOD2_navier_stokes_explicit_terms(
+    density: float,
+    viscosity: float,
+    dt: float,
+    grid: grids.Grid,
+#     convect: Optional[ConvectFn] = None,
+#     diffuse: DiffuseFn = diffusion.diffuse,
+    applySuperresolution: lambda x: x,
+    forcing: Optional[ForcingFn] = None,
+) -> Callable[[GridVariableVector], GridVariableVector]:
+  """Returns a function that performs a time step of Navier Stokes."""
+  del grid  # unused
+
+  if convect is None:
+    def convect(v):  # pylint: disable=function-redefined
+      return tuple(
+          advection.advect_van_leer_using_limiters(u, v, dt) for u in v)
+  
+  def diffuse_velocity(v, *args):
+    vels = []
+    for vel in v:
+        vels.append(vel.array.data)
+    out = diffuse(jnp.dstack(vels),*args)
+
+    out = reshapeData(out,v[0].grid,
+                offsets=[v[0].offset,v[1].offset],
+                bcs = [v[0].bc,v[1].bc]
+                     )
+
+    return out
+
+  def superresolution(v):
+    vels = []
+    for vel in v:
+        vels.append(vel.array.data)
+    reshapedV = jnp.dstack(vels)
+    
+    high_def = applySuperresolution(reshapedV)
+    u = high_def[:,:,0]
+    v = high_def[:,:,1]
+    [dudy,dudx] = np.gradient(u)
+    [dvdy,dvdx] = np.gradient(v)
+    lapu = np.gradient(dudx,axis=1) + np.gradient(dudy,axis=0)
+    lapv = np.gradient(dvdx,axis=1) + np.gradient(dvdy,axis=0)
+    laps = jnp.dstack([
+        lapu,
+        lapv
+    ])
+    laps = sampling(laps,factor)*viscosity/density
+    convection = jnp.dstack([
+        u*dudx + u*dudy,
+        v*dvdx + v*dvdy
+    ])
+    convection = sampling(convection,factor)
+    
+    return laps-convection
+  
+
+#   convection = _wrap_term_as_vector(convect, name='convection')
+  
+#   diffusion_ = _wrap_term_as_vector(diffuse_velocity, name='diffusion')
+  
+  superresolution_ = _wrap_term_as_vector(diffuse_velocity, name='superresolution')
+  
+  if forcing is not None:
+    forcing = _wrap_term_as_vector(forcing, name='forcing')
+
+  @tree_math.wrap
+  @functools.partial(jax.named_call, name='navier_stokes_momentum')
+  def _explicit_terms(v):
+    dv_dt = superresolution(v,factor,viscosity/density)
+    
+    
+    
+    
+#     dv_dt = convection(v)
+#     if viscosity is not None:
+#       dv_dt += diffusion_(v, viscosity / density)
+    if forcing is not None:
+      dv_dt += forcing(v) / density
+    return dv_dt
+
+  def explicit_terms_with_same_bcs(v):
+    dv_dt = _explicit_terms(v)
+    return tuple(grids.GridVariable(a, u.bc) for a, u in zip(dv_dt, v))
+
+  return explicit_terms_with_same_bcs
 
 
 def implicit_diffusion_navier_stokes(
