@@ -18,6 +18,7 @@ from typing import Callable, Optional
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from jax_cfd.base import advection
 from jax_cfd.base import diffusion
@@ -231,6 +232,7 @@ def corrected_navier_stokes_explicit_terms(
           advection.advect_van_leer_using_limiters(u, v, dt) for u in v)
   
   def diffuse_velocity(v, *args):
+    
     vels = []
     for vel in v:
         vels.append(vel.array.data)
@@ -313,37 +315,39 @@ def HYBMOD2_navier_stokes_explicit_terms(
     grid: grids.Grid,
 #     convect: Optional[ConvectFn] = None,
 #     diffuse: DiffuseFn = diffusion.diffuse,
+    factor: float,
     applySuperresolution: lambda x: x,
     forcing: Optional[ForcingFn] = None,
 ) -> Callable[[GridVariableVector], GridVariableVector]:
   """Returns a function that performs a time step of Navier Stokes."""
   del grid  # unused
 
-  if convect is None:
-    def convect(v):  # pylint: disable=function-redefined
-      return tuple(
-          advection.advect_van_leer_using_limiters(u, v, dt) for u in v)
+#   if convect is None:
+#     def convect(v):  # pylint: disable=function-redefined
+#       return tuple(
+#           advection.advect_van_leer_using_limiters(u, v, dt) for u in v)
   
-  def diffuse_velocity(v, *args):
-    vels = []
-    for vel in v:
-        vels.append(vel.array.data)
-    out = diffuse(jnp.dstack(vels),*args)
+#   def diffuse_velocity(v, *args):
+#     vels = []
+#     for vel in v:
+#         vels.append(vel.array.data)
+#     out = diffuse(jnp.dstack(vels),*args)
 
-    out = reshapeData(out,v[0].grid,
-                offsets=[v[0].offset,v[1].offset],
-                bcs = [v[0].bc,v[1].bc]
-                     )
+#     out = reshapeData(out,v[0].grid,
+#                 offsets=[v[0].offset,v[1].offset],
+#                 bcs = [v[0].bc,v[1].bc]
+#                      )
 
-    return out
+#     return out
 
   def superresolution(v):
-    vels = []
-    for vel in v:
-        vels.append(vel.array.data)
-    reshapedV = jnp.dstack(vels)
+    flat = v.tree_flatten()[0][0]
     
-    high_def = applySuperresolution(reshapedV)
+    u = flat[0].array.data
+    v = flat[1].array.data
+    reshapedV = jnp.dstack([u,v])
+    
+    high_def = applySuperresolution(reshapedV,factor)
     u = high_def[:,:,0]
     v = high_def[:,:,1]
     [dudy,dudx] = np.gradient(u)
@@ -354,26 +358,21 @@ def HYBMOD2_navier_stokes_explicit_terms(
         lapu,
         lapv
     ])
-    laps = sampling(laps,factor)*viscosity/density
+    diffusion = sampling(laps,factor)*viscosity/density
     convection = jnp.dstack([
         u*dudx + u*dudy,
         v*dvdx + v*dvdy
     ])
     convection = sampling(convection,factor)
-    out = laps-convection
+    out = diffusion-convection
     
-    out = reshapeData(out,v[0].grid,
-                offsets=[v[0].offset,v[1].offset],
-                bcs = [v[0].bc,v[1].bc]
+    out = reshapeData(out,flat[0].grid,
+                offsets=[flat[0].offset,flat[1].offset],
+                bcs = [flat[0].bc,flat[1].bc]
                      )
-    return out
+    return tree_math.Vector(out)
   
-
-#   convection = _wrap_term_as_vector(convect, name='convection')
-  
-#   diffusion_ = _wrap_term_as_vector(diffuse_velocity, name='diffusion')
-  
-  superresolution_ = _wrap_term_as_vector(diffuse_velocity, name='superresolution')
+  superresolution_ = _wrap_term_as_vector(superresolution, name='superresolution')
   
   if forcing is not None:
     forcing = _wrap_term_as_vector(forcing, name='forcing')
@@ -381,14 +380,8 @@ def HYBMOD2_navier_stokes_explicit_terms(
   @tree_math.wrap
   @functools.partial(jax.named_call, name='navier_stokes_momentum')
   def _explicit_terms(v):
-    dv_dt = superresolution(v,factor,viscosity/density)
+    dv_dt = superresolution(v)
     
-    
-    
-    
-#     dv_dt = convection(v)
-#     if viscosity is not None:
-#       dv_dt += diffusion_(v, viscosity / density)
     if forcing is not None:
       dv_dt += forcing(v) / density
     return dv_dt
