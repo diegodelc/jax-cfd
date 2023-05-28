@@ -116,12 +116,7 @@ def navier_stokes_explicit_terms(
   
   diffusion_ = _wrap_term_as_vector(diffuse_velocity, name='diffusion')
   
-  def printer(v,name):
-    print(name + " from printer")
-    print(v)
-    print("")
-  
-  printer_ = _wrap_term_as_vector(printer, name='printer')
+
 
   
   if forcing is not None:
@@ -130,9 +125,9 @@ def navier_stokes_explicit_terms(
   @tree_math.wrap
   @functools.partial(jax.named_call, name='navier_stokes_momentum')
   def _explicit_terms(v):
-    printer_(v,"v")
+
     dv_dt = convection(v)
-    printer_(dv_dt,"dvdt")
+
     if viscosity is not None:
       dv_dt += diffusion_(v, viscosity / density)
     if forcing is not None:
@@ -364,13 +359,29 @@ def HYBMOD2_navier_stokes_explicit_terms(
         v*dvdx + v*dvdy
     ])
     convection = sampling(convection,factor)
-    out = diffusion-convection
+    out = diffusion #-convection
     
     out = reshapeData(out,flat[0].grid,
                 offsets=[flat[0].offset,flat[1].offset],
                 bcs = [flat[0].bc,flat[1].bc]
                      )
     return tree_math.Vector(out)
+  
+    
+  def convect(v):  # pylint: disable=function-redefined
+    return tuple(
+      advection.advect_van_leer(u, v, dt) for u in v)
+  
+ 
+    
+  
+  convection = _wrap_term_as_vector(convect, name='convection')
+  
+  
+  
+
+
+
   
   superresolution_ = _wrap_term_as_vector(superresolution, name='superresolution')
   
@@ -381,7 +392,7 @@ def HYBMOD2_navier_stokes_explicit_terms(
   @functools.partial(jax.named_call, name='navier_stokes_momentum')
   def _explicit_terms(v):
     dv_dt = superresolution(v)
-    
+    dv_dt += convection(v)
     if forcing is not None:
       dv_dt += forcing(v) / density
     return dv_dt
