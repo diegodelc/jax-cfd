@@ -304,13 +304,13 @@ def retrieveAll(data,padding):
 
     return out
 
-def sampleAll(data,factor,postprocess = sampling):
+def sampleAll(data,factor):
     myshape = np.shape(data)
     out = []
     for time in range(myshape[0]):
         partial = []
         for channel in range(myshape[-1]):
-            partial.append(postprocess(data[time][:,:,channel],factor))
+            partial.append(sampling(data[time][:,:,channel],factor))
         out.append(jnp.dstack(partial))
     return out
 def yDatasetOneTime(dataIN,which_outputs,padding,factor):
@@ -381,6 +381,18 @@ def getYdata(data,which_outputs,padding,postprocess,factor):
     
     Y = retrieveAll(Y,padding) #removes padding
     
-    Y = sampleAll(Y,factor,postprocess) #samples data to coarse grid dimensions
+    Y = sampleAll(Y,factor) #samples data to coarse grid dimensions
     
     return Y
+
+
+def calcLapsAll(data,factor):
+    out = []
+    
+    for thisTime in data:
+        lapu = sampling(npLaplacian(thisTime[:,:,0]),factor)
+        lapv = sampling(npLaplacian(thisTime[:,:,1]),factor)
+        
+        out.append(jnp.dstack([lapu,lapv]))
+    
+    return out
