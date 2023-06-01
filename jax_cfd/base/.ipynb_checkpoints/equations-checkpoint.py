@@ -221,10 +221,24 @@ def corrected_navier_stokes_explicit_terms(
   """Returns a function that performs a time step of Navier Stokes."""
   del grid  # unused
 
-  if convect is None:
-    def convect(v):  # pylint: disable=function-redefined
-      return tuple(
-          advection.advect_van_leer_using_limiters(u, v, dt) for u in v)
+#   if convect is None:
+  def convect(v):  # pylint: disable=function-redefined
+    return tuple(
+          advection.advect_van_leer(u, v, dt) for u in v)
+#   else:
+#   def convect_velocity(v):
+#       vels = []
+#       for vel in v:
+#         vels.append(vel.array.data)
+        
+#       out = convect(jnp.dstack(vels))
+
+#       out = reshapeData(out,v[0].grid,
+#                     offsets=[v[0].offset,v[1].offset],
+#                     bcs = [v[0].bc,v[1].bc]
+#                          )
+
+#       return out
   
   def diffuse_velocity(v, *args):
     
