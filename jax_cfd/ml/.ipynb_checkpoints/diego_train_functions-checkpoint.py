@@ -31,7 +31,7 @@ def staggeredLearningRate(*args):
 
         
 class MyTraining():
-    def __init__(self,X_train,Y_train,X_test,Y_test,rng_key,input_channels,epochs,learning_rates,batch_size = 32,validateEvery=1,printEvery=5,params=None,forward_pass=None,tol = 1e-5):
+    def __init__(self,X_train,Y_train,X_test,Y_test,rng_key,input_channels,epochs,learning_rates,batch_size = 32,validateEvery=1,printEvery=5,params=None,forward_pass=None,tol = 1e-5,PINN_bcs = False,PINN_coeff = 1.0):
         self.X_train = X_train
         self.Y_train = Y_train
         self.X_test = X_test
@@ -54,13 +54,39 @@ class MyTraining():
         
         self.learning_rates = learning_rates
         self.learning_rate = self.learning_rates[0]
+        
+        self.PINN_bcs = PINN_bcs
+        self.PINN_coeff = jnp.array(PINN_coeff)
     
     
     # Loss functions
-    def MeanSquaredErrorLoss(self, params,input_data, actual):
+    def MeanSquaredErrorLoss(self, params,input_data, actual,PINN_bcs=False):
         preds,truth = self.computePredAndTruth(params,input_data,actual)
         
-        return jnp.power(jnp.array(truth) - jnp.array(preds), 2).mean()
+        out = jnp.power(jnp.array(truth) - jnp.array(preds), 2).mean()
+        
+        if PINN_bcs:
+            PINN_loss = 0.0
+            for thisOne in range(len(preds)):
+                
+                
+               
+                for whichVel in [0,1]:
+                    
+                    
+                    PINN_loss += jnp.sum(jnp.abs(preds[thisOne][0,:,whichVel])**2) # top row, all columns
+                    PINN_loss += jnp.sum(jnp.abs(preds[thisOne][-1,:,whichVel])**2) # bottom row, all columns
+    
+                    PINN_loss += jnp.sum(jnp.abs(preds[thisOne][1:-1,0,whichVel])**2) # first column, all rows except for corners
+                    PINN_loss += jnp.sum(jnp.abs(preds[thisOne][1:-1,-1,whichVel])**2) # last column, all rows except for corners
+                    
+            
+            out += self.PINN_coeff * PINN_loss
+            
+            #convert to jnp.array()
+        
+        
+        return out
     # MeanSquaredErrorLoss = jax.jit(MeanSquaredErrorLoss)
 
 
@@ -126,7 +152,7 @@ class MyTraining():
         return jax.tree_map(lambda p,g: p-self.learning_rate*g, self.params, param_grads), loss, val_loss
 
     def train_stepNoValidation(self,X_train_batch,Y_train_batch):
-            loss, param_grads = value_and_grad(self.MeanSquaredErrorLoss)(self.params,self.X_train, self.Y_train)
+            loss, param_grads = value_and_grad(self.MeanSquaredErrorLoss)(self.params,self.X_train, self.Y_train,PINN_bcs = self.PINN_bcs)
 
 
             return jax.tree_map(self.UpdateWeights,self.params,param_grads), loss

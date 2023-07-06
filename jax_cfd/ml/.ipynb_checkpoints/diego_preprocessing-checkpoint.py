@@ -376,12 +376,15 @@ def createYDatasetNew(data,which_outputs,padding,factor):
         
     return out
 
-def getYdata(data,which_outputs,padding,postprocess,factor):
+def getYdata(data,which_outputs,padding,postprocess,factor,removePadding=True):
     Y = createYDatasetNew(data,which_outputs,padding,factor) #pads and calculates derivatives
     
-    Y = retrieveAll(Y,padding) #removes padding
+    if removePadding:
+        print("Padding removed")
+        Y = retrieveAll(Y,padding) #removes padding
     
-    Y = sampleAll(Y,factor) #samples data to coarse grid dimensions
+    if factor != 1:
+        Y = sampleAll(Y,factor) #samples data to coarse grid dimensions
     
     return Y
 
