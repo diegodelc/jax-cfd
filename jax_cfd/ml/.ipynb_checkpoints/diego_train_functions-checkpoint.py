@@ -73,15 +73,17 @@ class MyTraining():
                
                 for whichVel in [0,1]:
                     
-                    
+                    # CHANNEL WALLS
                     PINN_loss += jnp.sum(jnp.abs(preds[thisOne][0,:,whichVel])**2) # top row, all columns
                     PINN_loss += jnp.sum(jnp.abs(preds[thisOne][-1,:,whichVel])**2) # bottom row, all columns
     
-                    PINN_loss += jnp.sum(jnp.abs(preds[thisOne][1:-1,0,whichVel])**2) # first column, all rows except for corners
-                    PINN_loss += jnp.sum(jnp.abs(preds[thisOne][1:-1,-1,whichVel])**2) # last column, all rows except for corners
+                    # INLET AND OUTLET
+#                     PINN_loss += jnp.sum(jnp.abs(preds[thisOne][1:-1,0,whichVel])**2) # first column, all rows except for corners
+#                     PINN_loss += jnp.sum(jnp.abs(preds[thisOne][1:-1,-1,whichVel])**2) # last column, all rows except for corners
                     
             
             out += self.PINN_coeff * PINN_loss
+            
             
             #convert to jnp.array()
         
